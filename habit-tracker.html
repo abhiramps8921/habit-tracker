@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Habit Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+  // Default theme is dark. Only switch to light if the user previously chose it.
+  (function() {
+    try {
+      if (localStorage.getItem('habit-tracker-theme-v2') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root {
+    /* Dark theme is the default palette */
+    --bg: #15181a;
+    --card: #1f2326;
+    --ink: #edeceb;
+    --ink-soft: #9a9994;
+    --line: #33383b;
+    --accent: #29b98d;
+    --accent-strong: #5fd6ac;
+    --pending: #2b3033;
+    --danger: #e07a7a;
+    --heat-0: #23282b;
+    --heat-1: #123b31;
+    --heat-2: #185c49;
+    --heat-3: #1f8264;
+    --heat-4: #27a87c;
+    --heat-5: #33d69f;
+  }
+  html[data-theme="light"] {
+    --bg: #f6f5f1;
+    --card: #ffffff;
+    --ink: #1c1c1a;
+    --ink-soft: #6b6a63;
+    --line: #e3e1d8;
+    --accent: #0f6e56;
+    --accent-strong: #085041;
+    --pending: #e8e6dd;
+    --danger: #a32d2d;
+    --heat-0: #ebe9e0;
+    --heat-1: #cdead9;
+    --heat-2: #97d9b7;
+    --heat-3: #5fc796;
+    --heat-4: #2fae76;
+    --heat-5: #0f6e56;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif; min-height: 100vh;
+    padding: 40px 20px 80px; transition: background 0.2s ease, color 0.2s ease;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  header { margin-bottom: 20px; flex: 1; min-width: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-strong); font-weight: 600; margin: 0 0 6px; }
+  h1 { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 32px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 4px; }
+  .today-date { font-size: 13px; color: var(--ink-soft); font-weight: 500; }
+  .theme-toggle {
+    background: var(--card); border: 1px solid var(--line); color: var(--ink);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; display: flex; align-items: center; gap: 6px;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+
+  .tabs { display: flex; gap: 6px; margin: 22px 0 26px; border-bottom: 1px solid var(--line); }
+  .tab-btn {
+    background: transparent; padding: 10px 4px; margin-right: 20px;
+    font-size: 14px; font-weight: 600; color: var(--ink-soft);
+    border-bottom: 2px solid transparent; border-radius: 0;
+  }
+  .tab-btn.active { color: var(--accent-strong); border-bottom-color: var(--accent); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .add-row { display: flex; gap: 10px; margin-bottom: 22px; }
+  input[type="text"], textarea, input[type="date"] {
+    padding: 13px 16px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); font-size: 15px; font-family: inherit; color: var(--ink);
+  }
+  input[type="text"] { flex: 1; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: none; border-radius: 10px; }
+  .btn-add { background: var(--accent); color: #08201a; padding: 13px 22px; white-space: nowrap; }
+  .btn-add:hover { background: var(--accent-strong); }
+
+  /* Dashboard */
+  .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+  .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; margin: 0 0 6px; }
+  .stat-value { font-family: 'Manrope', sans-serif; font-size: 22px; font-weight: 800; margin: 0; }
+  .stat-sub { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
+
+  .habit-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .habit-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+  .complete-control { display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
+  .complete-control input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+  .complete-label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); user-select: none; }
+  .complete-control.done .complete-label { color: var(--accent-strong); }
+  .habit-info { flex: 1; min-width: 0; }
+  .habit-name { font-weight: 600; font-size: 15px; margin: 0 0 2px; }
+  .habit-streak { font-size: 12.5px; color: var(--ink-soft); margin: 0; }
+  .dots { display: flex; gap: 4px; margin-right: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pending); }
+  .dot.on { background: var(--accent); }
+  .habit-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .edit-btn, .del, .restore-btn { background: transparent; color: var(--ink-soft); font-size: 13px; padding: 6px 10px; }
+  .edit-btn:hover { color: var(--accent-strong); }
+  .del:hover { color: var(--danger); }
+  .restore-btn:hover { color: var(--accent-strong); }
+  .habit-name-input { width: 100%; font-size: 15px; font-weight: 600; font-family: inherit; color: var(--ink); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 8px; margin: 0 0 2px; }
+
+  .empty { text-align: center; color: var(--ink-soft); font-size: 14px; padding: 32px 0; border: 1px dashed var(--line); border-radius: 12px; margin-bottom: 24px; }
+
+  .archived-toggle { background: transparent; color: var(--ink-soft); font-size: 13px; padding: 6px 0; margin-bottom: 24px; text-decoration: underline; text-underline-offset: 2px; }
+  .archived-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .archived-card { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; opacity: 0.85; }
+  .archived-name { flex: 1; font-size: 14px; }
+  .archived-date { font-size: 12px; color: var(--ink-soft); }
+
+  .charts { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
+  .chart-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .chart-title { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+  .chart-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .range-picker { display: flex; gap: 4px; background: var(--pending); border-radius: 8px; padding: 3px; }
+  .range-btn { background: transparent; color: var(--ink-soft); font-size: 11.5px; font-weight: 700; padding: 5px 9px; border-radius: 6px; line-height: 1; }
+  .range-btn.active { background: var(--card); color: var(--accent-strong); }
+  .chart-box { position: relative; height: 210px; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12.5px; color: var(--ink-soft); flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; }
+
+  /* Calendar */
+  .cal-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; overflow-x: auto; margin-bottom: 20px; }
+  .cal-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; width: max-content; }
+  .cal-cell { width: 12px; height: 12px; border-radius: 3px; cursor: pointer; background: var(--heat-0); }
+  .cal-cell.blank { cursor: default; background: transparent; }
+  .cal-cell:hover { outline: 1.5px solid var(--ink-soft); }
+  .cal-legend { display: flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 12px; color: var(--ink-soft); }
+  .cal-legend .cal-cell { cursor: default; }
+  .cal-legend .cal-cell:hover { outline: none; }
+  .cal-detail {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 20px; min-height: 60px;
+  }
+  .cal-detail-date { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 17px; margin: 0 0 8px; }
+  .cal-detail-pct { font-size: 26px; font-weight: 800; color: var(--accent-strong); margin: 0 0 4px; }
+  .cal-detail-frac { font-size: 13px; color: var(--ink-soft); margin: 0 0 12px; }
+  .cal-detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cal-detail-col-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 700; margin: 0 0 6px; }
+  .cal-detail-item { font-size: 13.5px; margin: 0 0 4px; }
+  .cal-detail-journal { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13.5px; white-space: pre-wrap; line-height: 1.5; }
+  .cal-empty-hint { color: var(--ink-soft); font-size: 14px; }
+
+  /* Journal */
+  .journal-entry-form { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .journal-entry-form label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+  .journal-entry-form textarea { width: 100%; min-height: 140px; resize: vertical; margin: 10px 0 12px; line-height: 1.5; }
+  .journal-form-actions { display: flex; gap: 10px; }
+  .btn-delete-entry { background: transparent; border: 1px solid var(--line); color: var(--danger); padding: 13px 18px; }
+  .btn-delete-entry:hover { border-color: var(--danger); background: var(--pending); }
+  .journal-search {
+    width: 100%; margin-bottom: 16px;
+  }
+  .journal-list { display: flex; flex-direction: column; gap: 10px; }
+  .journal-past { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; position: relative; }
+  .journal-past:hover { border-color: var(--accent); }
+  .journal-past-date { font-size: 12.5px; font-weight: 700; color: var(--accent-strong); margin: 0 40px 4px 0; }
+  .journal-past-preview { font-size: 13.5px; color: var(--ink-soft); margin: 0; white-space: pre-wrap; }
+  .journal-past-del {
+    position: absolute; top: 10px; right: 10px; background: transparent; color: var(--ink-soft);
+    font-size: 12px; padding: 4px 8px;
+  }
+  .journal-past-del:hover { color: var(--danger); }
+  .journal-empty { color: var(--ink-soft); font-size: 14px; text-align: center; padding: 20px 0; }
+
+  @media (max-width: 680px) {
+    .charts { grid-template-columns: 1fr; }
+    .dashboard { grid-template-columns: repeat(2, 1fr); }
+    .cal-detail-cols { grid-template-columns: 1fr; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <header>
+      <p class="eyebrow">Daily log</p>
+      <h1>Habit tracker</h1>
+      <p class="sub">Check things off, keep your streaks alive. Saved right in this browser.</p>
+      <p class="today-date" id="today-date"></p>
+    </header>
+    <button class="theme-toggle" id="theme-toggle-btn"><span id="theme-icon">☀️</span><span id="theme-label">Light</span></button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-tracker-btn">Tracker</button>
+    <button class="tab-btn" id="tab-calendar-btn">Calendar</button>
+    <button class="tab-btn" id="tab-journal-btn">Journal</button>
+  </div>
+
+  <div class="panel active" id="panel-tracker">
+    <div class="dashboard" id="dashboard"></div>
+
+    <div class="add-row">
+      <input type="text" id="habit-input" placeholder="Add a habit, e.g. Solve 5 DSA problems" />
+      <button class="btn-add" id="add-btn">Add habit</button>
+    </div>
+
+    <div class="habit-list" id="habit-list"></div>
+    <div class="empty" id="empty-state" style="display:none;">No active habits. Add your first one above.</div>
+
+    <button class="archived-toggle" id="archived-toggle" style="display:none;">Show archived habits</button>
+    <div class="archived-list" id="archived-list" style="display:none;"></div>
+
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-head-row">
+          <p class="chart-title" id="rateChartTitle">Daily completion</p>
+          <div class="range-picker" id="range-picker">
+            <button class="range-btn" data-range="1w">1W</button>
+            <button class="range-btn" data-range="2w">2W</button>
+            <button class="range-btn" data-range="1m">1M</button>
+            <button class="range-btn" data-range="3m">3M</button>
+            <button class="range-btn" data-range="6m">6M</button>
+            <button class="range-btn" data-range="1y">1Y</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="rateChart" role="img" aria-label="Line chart of daily completion percentage over the selected time range"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <p class="chart-title" style="margin-bottom:12px;">Today</p>
+        <div class="chart-box"><canvas id="pieChart" role="img" aria-label="Pie chart of today's completed versus pending habits"></canvas></div>
+        <div class="legend" id="pie-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-calendar">
+    <div class="cal-detail" id="cal-detail">
+      <p class="cal-empty-hint">Tap a day in the calendar to see details for that date.</p>
+    </div>
+    <div class="cal-wrap">
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-legend">
+        <span>Less</span>
+        <div class="cal-cell" style="background:var(--heat-0);"></div>
+        <div class="cal-cell" style="background:var(--heat-1);"></div>
+        <div class="cal-cell" style="background:var(--heat-2);"></div>
+        <div class="cal-cell" style="background:var(--heat-3);"></div>
+        <div class="cal-cell" style="background:var(--heat-4);"></div>
+        <div class="cal-cell" style="background:var(--heat-5);"></div>
+        <span>More</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-journal">
+    <div class="journal-entry-form">
+      <label for="journal-date">Entry date</label>
+      <input type="date" id="journal-date" />
+      <textarea id="journal-text" placeholder="Write about your day..."></textarea>
+      <div class="journal-form-actions">
+        <button class="btn-add" id="journal-save-btn">Save entry</button>
+        <button class="btn-delete-entry" id="journal-delete-btn">Delete entry</button>
+      </div>
+    </div>
+    <input type="text" id="journal-search" placeholder="Search journal entries..." class="journal-search" />
+    <div class="journal-list" id="journal-list"></div>
+  </div>
+</div>
+
+<script>
+/* ================= Constants ================= */
+const DATA_KEY = 'habit-tracker-data-v3';
+const OLD_DATA_KEY = 'habit-tracker-data-v2';
+const JOURNAL_KEY = 'habit-tracker-journal-v1';
+const THEME_KEY = 'habit-tracker-theme-v2';
+const SENTINEL_EARLY_DATE = '2000-01-01'; // used to migrate legacy habits with unknown creation date
+
+/* ================= State ================= */
+// habit: { id, name, createdAt: 'YYYY-MM-DD', archivedAt: 'YYYY-MM-DD' | null }
+// completions: { 'YYYY-MM-DD': [habitId, ...] }  -- raw record of what was checked off each day
+let state = { habits: [], completions: {} };
+let journal = {};
+let editingHabitId = null;
+let showArchived = false;
+let currentRange = '2w';
+let rateChart = null, pieChart = null;
+let currentDayKey = null;
+
+/* ================= Date helpers ================= */
+function pad(n) { return String(n).padStart(2, '0'); }
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function todayKey() { return dateKey(new Date()); }
+function fullLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+function shortLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return dateKey(d);
+}
+
+/* ================= Persistence & migration ================= */
+function save() {
+  try { localStorage.setItem(DATA_KEY, JSON.stringify(state)); }
+  catch (e) { console.error('Could not save habit data', e); }
+}
+function saveJournal() {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); }
+  catch (e) { console.error('Could not save journal', e); }
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(DATA_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state.habits = parsed.habits || [];
+      state.completions = parsed.completions || {};
+    } else {
+      // Try migrating from the older schema (no createdAt/archivedAt on habits)
+      const oldRaw = localStorage.getItem(OLD_DATA_KEY);
+      if (oldRaw) {
+        const oldParsed = JSON.parse(oldRaw);
+        state.completions = oldParsed.completions || {};
+        state.habits = (oldParsed.habits || []).map(h => ({
+          id: h.id,
+          name: h.name,
+          createdAt: SENTINEL_EARLY_DATE, // treat pre-existing habits as always active historically
+          archivedAt: null
+        }));
+        save();
+      }
+    }
+  } catch (e) { state = { habits: [], completions: {} }; }
+
+  try {
+    const rawJ = localStorage.getItem(JOURNAL_KEY);
+    journal = rawJ ? JSON.parse(rawJ) : {};
+  } catch (e) { journal = {}; }
+}
+
+/* ================= Habit lifecycle (immutable history core) ================= */
+function isActiveOn(habit, dateStr) {
+  if (habit.createdAt > dateStr) return false;
+  if (habit.archivedAt !== null && habit.archivedAt !== undefined && dateStr >= habit.archivedAt) return false;
+  return true;
+}
+function activeHabitsOn(dateStr) {
+  return state.habits.filter(h => isActiveOn(h, dateStr));
+}
+// The single source of truth for any day's stats. Never derived from the current habit list.
+function statsForDate(dateStr) {
+  const active = activeHabitsOn(dateStr);
+  const total = active.length;
+  const doneIds = (state.completions[dateStr] || []).filter(id => active.some(h => h.id === id));
+  const completed = doneIds.length;
+  const rate = total === 0 ? 0 : Math.round((completed / total) * 1000) / 10; // one decimal
+  return { total, completed, rate, doneIds, active };
+}
+
+function earliestHabitDate() {
+  if (state.habits.length === 0) return todayKey();
+  return state.habits.reduce((min, h) => (h.createdAt < min ? h.createdAt : min), state.habits[0].createdAt);
+}
+
+/* ================= Streaks (based on daily completion %, not per-habit) ================= */
+function currentOverallStreak() {
+  let streak = 0;
+  let cursor = todayKey();
+  const todayStats = statsForDate(cursor);
+  if (!(todayStats.total > 0 && todayStats.rate === 100)) {
+    cursor = addDays(cursor, -1); // today not finished yet; doesn't break the streak, just isn't counted
+  }
+  while (true) {
+    const s = statsForDate(cursor);
+    if (s.total > 0 && s.rate === 100) { streak++; cursor = addDays(cursor, -1); }
+    else break;
+  }
+  return streak;
+}
+
+function longestOverallStreak() {
+  const start = earliestHabitDate();
+  const end = todayKey();
+  let longest = 0, running = 0;
+  let cursor = start;
+  // guard against runaway loops
+  let safety = 0;
+  while (cursor <= end && safety < 4000) {
+    const s = statsForDate(cursor);
+    if (s.total > 0 && s.rate === 100) { running++; if (running > longest) longest = running; }
+    else running = 0;
+    cursor = addDays(cursor, 1);
+    safety++;
+  }
+  return longest;
+}
+
+function currentHabitStreak(habitId) {
+  let streak = 0;
+  let cursor = todayKey();
+  while (true) {
+    const list = state.completions[cursor] || [];
+    if (list.includes(habitId)) { streak++; cursor = addDays(cursor, -1); }
+    else break;
+  }
+  return streak;
+}
+
+/* ================= Rendering: header & dashboard ================= */
+function renderTrackerHeader() {
+  document.getElementById('today-date').textContent = fullLabel(todayKey());
+}
+
+function renderDashboard() {
+  const s = statsForDate(todayKey());
+  const dash = document.getElementById('dashboard');
+  const curStreak = currentOverallStreak();
+  const longStreak = longestOverallStreak();
+  dash.innerHTML = '';
+  const cards = [
+    { label: 'Progress today', value: s.total === 0 ? '—' : s.rate + '%', sub: s.total === 0 ? 'no active habits' : '' },
+    { label: 'Completed', value: s.completed + ' / ' + s.total, sub: 'habits today' },
+    { label: 'Current streak', value: curStreak + (curStreak === 1 ? ' day' : ' days'), sub: 'fully completed' },
+    { label: 'Longest streak', value: longStreak + (longStreak === 1 ? ' day' : ' days'), sub: 'best ever' }
+  ];
+  cards.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.innerHTML = '<p class="stat-label">' + c.label + '</p><p class="stat-value">' + c.value + '</p>' + (c.sub ? '<p class="stat-sub">' + c.sub + '</p>' : '');
+    dash.appendChild(card);
+  });
+}
+
+/* ================= Rendering: habit list ================= */
+function renderHabits() {
+  const list = document.getElementById('habit-list');
+  const empty = document.getElementById('empty-state');
+  list.innerHTML = '';
+  const tKey = todayKey();
+  const active = state.habits.filter(h => h.archivedAt === null || h.archivedAt === undefined);
+  empty.style.display = active.length === 0 ? 'block' : 'none';
+  const doneToday = state.completions[tKey] || [];
+  const days7 = [];
+  for (let i = 6; i >= 0; i--) days7.push(addDays(tKey, -i));
+
+  active.forEach(h => {
+    const done = doneToday.includes(h.id);
+    const streak = currentHabitStreak(h.id);
+
+    const card = document.createElement('div');
+    card.className = 'habit-card';
+
+    const controlWrap = document.createElement('label');
+    controlWrap.className = 'complete-control' + (done ? ' done' : '');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = done;
+    checkbox.setAttribute('aria-label', 'Mark ' + h.name + ' as complete for today');
+    checkbox.addEventListener('change', () => toggleToday(h.id));
+    const clabel = document.createElement('span');
+    clabel.className = 'complete-label';
+    clabel.textContent = done ? 'Done' : 'Mark complete';
+    controlWrap.appendChild(checkbox);
+    controlWrap.appendChild(clabel);
+
+    const info = document.createElement('div');
+    info.className = 'habit-info';
+    if (editingHabitId === h.id) {
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'habit-name-input';
+      nameInput.value = h.name;
+      nameInput.setAttribute('aria-label', 'Rename ' + h.name);
+      const commit = () => saveRename(h.id, nameInput.value);
+      nameInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') { editingHabitId = null; renderHabits(); }
+      });
+      nameInput.addEventListener('blur', commit);
+      info.appendChild(nameInput);
+      setTimeout(() => { nameInput.focus(); nameInput.select(); }, 0);
+    } else {
+      const name = document.createElement('p');
+      name.className = 'habit-name';
+      name.textContent = h.name;
+      info.appendChild(name);
+    }
+    const streakEl = document.createElement('p');
+    streakEl.className = 'habit-streak';
+    streakEl.textContent = streak + ' day' + (streak === 1 ? '' : 's') + ' streak';
+    info.appendChild(streakEl);
+
+    const dots = document.createElement('div');
+    dots.className = 'dots';
+    days7.forEach(dKey => {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + ((state.completions[dKey] || []).includes(h.id) ? ' on' : '');
+      dot.title = shortLabel(dKey);
+      dots.appendChild(dot);
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'habit-actions';
+    const edit = document.createElement('button');
+    edit.className = 'edit-btn';
+    edit.textContent = editingHabitId === h.id ? 'Save' : 'Edit';
+    edit.onclick = () => {
+      if (editingHabitId === h.id) {
+        const input = edit.closest('.habit-card').querySelector('.habit-name-input');
+        saveRename(h.id, input ? input.value : h.name);
+      } else { editingHabitId = h.id; renderHabits(); }
+    };
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = 'Archive';
+    del.setAttribute('aria-label', 'Archive ' + h.name);
+    del.onclick = () => archiveHabit(h.id);
+
+    actions.appendChild(edit);
+    actions.appendChild(del);
+
+    card.appendChild(controlWrap);
+    card.appendChild(info);
+    card.appendChild(dots);
+    card.appendChild(actions);
+    list.appendChild(card);
+  });
+
+  renderArchivedSection();
+  renderDashboard();
+  renderCharts();
+}
+
+function renderArchivedSection() {
+  const archived = state.habits.filter(h => h.archivedAt !== null && h.archivedAt !== undefined);
+  const toggleBtn = document.getElementById('archived-toggle');
+  const archList = document.getElementById('archived-list');
+  if (archived.length === 0) {
+    toggleBtn.style.display = 'none';
+    archList.style.display = 'none';
+    return;
+  }
+  toggleBtn.style.display = 'block';
+  toggleBtn.textContent = showArchived ? 'Hide archived habits' : 'Show archived habits (' + archived.length + ')';
+  archList.style.display = showArchived ? 'flex' : 'none';
+  archList.innerHTML = '';
+  archived.forEach(h => {
+    const card = document.createElement('div');
+    card.className = 'archived-card';
+    const name = document.createElement('span');
+    name.className = 'archived-name';
+    name.textContent = h.name;
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'archived-date';
+    dateSpan.textContent = 'Archived ' + shortLabel(h.archivedAt);
+    const restore = document.createElement('button');
+    restore.className = 'restore-btn';
+    restore.textContent = 'Restore';
+    restore.onclick = () => restoreHabit(h.id);
+    card.appendChild(name);
+    card.appendChild(dateSpan);
+    card.appendChild(restore);
+    archList.appendChild(card);
+  });
+}
+
+document.getElementById('archived-toggle').onclick = () => {
+  showArchived = !showArchived;
+  renderArchivedSection();
+};
+
+/* ================= Charts ================= */
+const RANGE_CONFIG = {
+  '1w': { mode: 'daily', count: 7, title: 'Daily completion — last 7 days' },
+  '2w': { mode: 'daily', count: 14, title: 'Daily completion — last 14 days' },
+  '1m': { mode: 'daily', count: 30, title: 'Daily completion — last 30 days' },
+  '3m': { mode: 'weekly', count: 13, title: 'Daily completion — last 3 months' },
+  '6m': { mode: 'weekly', count: 26, title: 'Daily completion — last 6 months' },
+  '1y': { mode: 'monthly', count: 12, title: 'Daily completion — last 12 months' }
+};
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function buildDailyBuckets(numDays) {
+  const buckets = [];
+  const tKey = todayKey();
+  for (let i = numDays - 1; i >= 0; i--) {
+    const key = addDays(tKey, -i);
+    const s = statsForDate(key);
+    buckets.push({ label: shortLabel(key), dateLabel: fullLabel(key), rate: s.rate, completed: s.completed, total: s.total });
+  }
+  return buckets;
+}
+
+function buildWeeklyBuckets(numWeeks) {
+  const buckets = [];
+  const tKey = todayKey();
+  for (let w = numWeeks - 1; w >= 0; w--) {
+    const weekEnd = addDays(tKey, -(w * 7));
+    const weekStart = addDays(weekEnd, -6);
+    let sumCompleted = 0, sumTotal = 0;
+    for (let i = 0; i < 7; i++) {
+      const key = addDays(weekStart, i);
+      const s = statsForDate(key);
+      sumCompleted += s.completed; sumTotal += s.total;
+    }
+    const rate = sumTotal === 0 ? 0 : Math.round((sumCompleted / sumTotal) * 1000) / 10;
+    buckets.push({ label: shortLabel(weekStart), dateLabel: 'Week of ' + fullLabel(weekStart), rate, completed: sumCompleted, total: sumTotal });
+  }
+  return buckets;
+}
+
+function buildMonthlyBuckets(numMonths) {
+  const buckets = [];
+  const today = new Date();
+  for (let m = numMonths - 1; m >= 0; m--) {
+    const monthDate = new Date(today.getFullYear(), today.getMonth() - m, 1);
+    const nextMonthDate = new Date(today.getFullYear(), today.getMonth() - m + 1, 1);
+    let sumCompleted = 0, sumTotal = 0;
+    for (let d = new Date(monthDate); d < nextMonthDate && d <= today; d.setDate(d.getDate() + 1)) {
+      const key = dateKey(d);
+      const s = statsForDate(key);
+      sumCompleted += s.completed; sumTotal += s.total;
+    }
+    const rate = sumTotal === 0 ? 0 : Math.round((sumCompleted / sumTotal) * 1000) / 10;
+    const label = monthDate.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+    buckets.push({ label, dateLabel: monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }), rate, completed: sumCompleted, total: sumTotal });
+  }
+  return buckets;
+}
+
+function renderRateChart() {
+  const config = RANGE_CONFIG[currentRange];
+  let buckets;
+  if (config.mode === 'daily') buckets = buildDailyBuckets(config.count);
+  else if (config.mode === 'weekly') buckets = buildWeeklyBuckets(config.count);
+  else buckets = buildMonthlyBuckets(config.count);
+
+  document.getElementById('rateChartTitle').textContent = config.title;
+  document.querySelectorAll('.range-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.range === currentRange));
+
+  const ctx = document.getElementById('rateChart');
+  if (rateChart) rateChart.destroy();
+  const accent = cssVar('--accent') || '#0f6e56';
+  const ink = cssVar('--ink') || '#1c1c1a';
+  const line = cssVar('--line') || '#e3e1d8';
+
+  rateChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{
+        data: buckets.map(b => b.rate),
+        borderColor: accent, backgroundColor: accent + '33',
+        fill: true, tension: 0.25, pointRadius: 3, pointBackgroundColor: accent, pointHoverRadius: 5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%', color: ink }, grid: { color: line } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 14, color: ink } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx2 => buckets[ctx2[0].dataIndex].dateLabel,
+            label: ctx2 => buckets[ctx2.dataIndex].rate + '%',
+            afterLabel: ctx2 => {
+              const b = buckets[ctx2.dataIndex];
+              return b.completed + ' / ' + b.total + ' habits completed';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderPieChart() {
+  const tKey = todayKey();
+  const s = statsForDate(tKey);
+  const pending = Math.max(s.total - s.completed, 0);
+  const ctx = document.getElementById('pieChart');
+  if (pieChart) pieChart.destroy();
+  const legend = document.getElementById('pie-legend');
+  const accent = cssVar('--accent') || '#0f6e56';
+  const pendingColor = cssVar('--pending') || '#e8e6dd';
+
+  if (s.total === 0) {
+    pieChart = new Chart(ctx, {
+      type: 'pie',
+      data: { labels: ['No active habits'], datasets: [{ data: [1], backgroundColor: [pendingColor] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+    });
+    legend.innerHTML = '';
+  } else {
+    pieChart = new Chart(ctx, {
+      type: 'pie',
+      data: { labels: ['Completed', 'Pending'], datasets: [{ data: [s.completed, pending], backgroundColor: [accent, pendingColor] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed } } } }
+    });
+    legend.innerHTML =
+      '<span><span class="swatch" style="background:' + accent + ';"></span>Completed ' + s.completed + '</span>' +
+      '<span><span class="swatch" style="background:' + pendingColor + ';"></span>Pending ' + pending + '</span>';
+  }
+}
+
+function renderCharts() { renderRateChart(); renderPieChart(); }
+
+document.getElementById('range-picker').addEventListener('click', e => {
+  const btn = e.target.closest('.range-btn');
+  if (!btn) return;
+  currentRange = btn.dataset.range;
+  renderRateChart();
+});
+
+/* ================= Actions ================= */
+function toggleToday(habitId) {
+  const tKey = todayKey();
+  const list = state.completions[tKey] || [];
+  state.completions[tKey] = list.includes(habitId) ? list.filter(id => id !== habitId) : [...list, habitId];
+  save();
+  renderHabits();
+  if (document.getElementById('panel-calendar').classList.contains('active')) renderCalendar();
+}
+
+function addHabit(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  state.habits.push({ id: 'h' + Date.now() + Math.floor(Math.random() * 1000), name: trimmed, createdAt: todayKey(), archivedAt: null });
+  save();
+  renderHabits();
+}
+
+function archiveHabit(id) {
+  const habit = state.habits.find(h => h.id === id);
+  if (!habit) return;
+  habit.archivedAt = todayKey();
+  save();
+  renderHabits();
+}
+
+function restoreHabit(id) {
+  const habit = state.habits.find(h => h.id === id);
+  if (!habit) return;
+  habit.archivedAt = null;
+  save();
+  renderHabits();
+}
+
+function saveRename(id, newName) {
+  const trimmed = (newName || '').trim();
+  const habit = state.habits.find(h => h.id === id);
+  if (habit && trimmed) habit.name = trimmed;
+  editingHabitId = null;
+  save();
+  renderHabits();
+}
+
+document.getElementById('add-btn').onclick = () => {
+  const input = document.getElementById('habit-input');
+  addHabit(input.value);
+  input.value = '';
+};
+document.getElementById('habit-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { addHabit(e.target.value); e.target.value = ''; }
+});
+
+/* ================= Calendar (GitHub-style heatmap) ================= */
+function heatClassForRate(total, rate) {
+  if (total === 0) return 'var(--heat-0)';
+  if (rate === 0) return 'var(--heat-1)';
+  if (rate <= 25) return 'var(--heat-1)';
+  if (rate <= 50) return 'var(--heat-2)';
+  if (rate <= 75) return 'var(--heat-3)';
+  if (rate < 100) return 'var(--heat-4)';
+  return 'var(--heat-5)';
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  const tKey = todayKey();
+  const today = new Date(tKey + 'T00:00:00');
+  const totalDays = 371; // 53 weeks
+  const rangeStart = new Date(today);
+  rangeStart.setDate(today.getDate() - (totalDays - 1));
+  // Align grid start to the preceding Sunday
+  const gridStart = new Date(rangeStart);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+
+  const cellsByWeek = [];
+  let cursor = new Date(gridStart);
+  while (cursor <= today) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    cellsByWeek.push(week);
+  }
+
+  cellsByWeek.forEach(week => {
+    week.forEach(d => {
+      const cell = document.createElement('div');
+      if (d > today || d < rangeStart) {
+        cell.className = 'cal-cell blank';
+      } else {
+        const key = dateKey(d);
+        const s = statsForDate(key);
+        cell.className = 'cal-cell';
+        cell.style.background = heatClassForRate(s.total, s.rate);
+        cell.title = fullLabel(key) + ' — ' + (s.total === 0 ? 'no active habits' : s.rate + '% (' + s.completed + '/' + s.total + ')');
+        cell.onclick = () => showCalendarDetail(key);
+      }
+      grid.appendChild(cell);
+    });
+  });
+}
+
+function showCalendarDetail(dateKeyStr) {
+  const s = statsForDate(dateKeyStr);
+  const detail = document.getElementById('cal-detail');
+  const completedNames = s.active.filter(h => s.doneIds.includes(h.id)).map(h => h.name);
+  const missedNames = s.active.filter(h => !s.doneIds.includes(h.id)).map(h => h.name);
+  const journalText = journal[dateKeyStr];
+
+  let html = '<p class="cal-detail-date">' + fullLabel(dateKeyStr) + '</p>';
+  if (s.total === 0) {
+    html += '<p class="cal-empty-hint">No active habits existed on this date.</p>';
+  } else {
+    html += '<p class="cal-detail-pct">' + s.rate + '%</p>';
+    html += '<p class="cal-detail-frac">' + s.completed + ' / ' + s.total + ' habits completed</p>';
+    html += '<div class="cal-detail-cols">';
+    html += '<div><p class="cal-detail-col-title">Completed</p>' + (completedNames.length ? completedNames.map(n => '<p class="cal-detail-item">✅ ' + n + '</p>').join('') : '<p class="cal-detail-item">None</p>') + '</div>';
+    html += '<div><p class="cal-detail-col-title">Missed</p>' + (missedNames.length ? missedNames.map(n => '<p class="cal-detail-item">⬜ ' + n + '</p>').join('') : '<p class="cal-detail-item">None</p>') + '</div>';
+    html += '</div>';
+  }
+  html += '<div class="cal-detail-journal">' + (journalText && journalText.trim() ? escapeHtml(journalText) : '<span class="cal-empty-hint">No journal entry for this date.</span>') + '</div>';
+  detail.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ================= Journal ================= */
+function renderJournalList() {
+  const list = document.getElementById('journal-list');
+  const searchInput = document.getElementById('journal-search');
+  const query = (searchInput.value || '').trim().toLowerCase();
+  list.innerHTML = '';
+
+  let keys = Object.keys(journal).filter(k => journal[k] && journal[k].trim() !== '').sort().reverse();
+  if (query) {
+    keys = keys.filter(k => {
+      const dateLabel = fullLabel(k).toLowerCase();
+      return dateLabel.includes(query) || journal[k].toLowerCase().includes(query);
+    });
+  }
+
+  if (keys.length === 0) {
+    list.innerHTML = '<p class="journal-empty">' + (query ? 'No entries match your search.' : 'No past entries yet.') + '</p>';
+    return;
+  }
+
+  keys.forEach(k => {
+    const card = document.createElement('div');
+    card.className = 'journal-past';
+    const dateP = document.createElement('p');
+    dateP.className = 'journal-past-date';
+    dateP.textContent = fullLabel(k);
+    const preview = document.createElement('p');
+    preview.className = 'journal-past-preview';
+    const text = journal[k];
+    preview.textContent = text.length > 160 ? text.slice(0, 160) + '…' : text;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'journal-past-del';
+    delBtn.textContent = 'Delete';
+    delBtn.setAttribute('aria-label', 'Delete journal entry for ' + fullLabel(k));
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteJournalEntry(k); };
+
+    card.appendChild(delBtn);
+    card.appendChild(dateP);
+    card.appendChild(preview);
+    card.onclick = () => {
+      document.getElementById('journal-date').value = k;
+      document.getElementById('journal-text').value = journal[k];
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    list.appendChild(card);
+  });
+}
+
+function deleteJournalEntry(key) {
+  delete journal[key];
+  saveJournal();
+  if (document.getElementById('journal-date').value === key) {
+    document.getElementById('journal-text').value = '';
+  }
+  renderJournalList();
+}
+
+document.getElementById('journal-search').addEventListener('input', renderJournalList);
+
+document.getElementById('journal-delete-btn').onclick = () => {
+  const key = document.getElementById('journal-date').value || todayKey();
+  deleteJournalEntry(key);
+};
+
+function loadJournalEntryForDate(key) { document.getElementById('journal-text').value = journal[key] || ''; }
+document.getElementById('journal-date').addEventListener('change', e => loadJournalEntryForDate(e.target.value));
+document.getElementById('journal-save-btn').onclick = () => {
+  const key = document.getElementById('journal-date').value || todayKey();
+  journal[key] = document.getElementById('journal-text').value;
+  saveJournal();
+  renderJournalList();
+};
+
+/* ================= Tabs ================= */
+const tabTrackerBtn = document.getElementById('tab-tracker-btn');
+const tabCalendarBtn = document.getElementById('tab-calendar-btn');
+const tabJournalBtn = document.getElementById('tab-journal-btn');
+tabTrackerBtn.onclick = () => switchTab('tracker');
+tabCalendarBtn.onclick = () => switchTab('calendar');
+tabJournalBtn.onclick = () => switchTab('journal');
+
+function switchTab(name) {
+  document.getElementById('panel-tracker').classList.toggle('active', name === 'tracker');
+  document.getElementById('panel-calendar').classList.toggle('active', name === 'calendar');
+  document.getElementById('panel-journal').classList.toggle('active', name === 'journal');
+  tabTrackerBtn.classList.toggle('active', name === 'tracker');
+  tabCalendarBtn.classList.toggle('active', name === 'calendar');
+  tabJournalBtn.classList.toggle('active', name === 'journal');
+  if (name === 'calendar') renderCalendar();
+}
+
+/* ================= Theme ================= */
+function applyThemeUI() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = isLight ? 'Dark' : 'Light';
+}
+document.getElementById('theme-toggle-btn').onclick = () => {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(THEME_KEY, 'dark'); } catch (e) {}
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem(THEME_KEY, 'light'); } catch (e) {}
+  }
+  applyThemeUI();
+  renderCharts();
+};
+
+/* ================= Midnight auto-refresh (history stays untouched; only the view updates) ================= */
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  setTimeout(() => {
+    currentDayKey = todayKey();
+    renderTrackerHeader();
+    renderHabits();
+    document.getElementById('journal-date').value = todayKey();
+    loadJournalEntryForDate(todayKey());
+    renderJournalList();
+    if (document.getElementById('panel-calendar').classList.contains('active')) renderCalendar();
+    scheduleMidnightRefresh();
+  }, nextMidnight - now);
+}
+setInterval(() => {
+  const nowKey = todayKey();
+  if (currentDayKey && nowKey !== currentDayKey) {
+    currentDayKey = nowKey;
+    renderTrackerHeader();
+    renderHabits();
+  }
+}, 60 * 1000);
+
+/* ================= Init ================= */
+load();
+applyThemeUI();
+currentDayKey = todayKey();
+renderTrackerHeader();
+renderHabits();
+document.getElementById('journal-date').value = todayKey();
+loadJournalEntryForDate(todayKey());
+renderJournalList();
+scheduleMidnightRefresh();
+</script>
+</body>
+</html>
